@@ -55,7 +55,7 @@ source venv/bin/activate
 ```
 
 
-> 💡 **Tip:** If you are unsure which command to use, open the generated `venv` folder. If it contains a `Scripts` folder, use  `venv/Scripts/activate` as the path in the command. If it contains a `bin` folder, use ``venv/bin/activate` as the path in the command.
+> 💡 **Tip:** If you are unsure which command to use, open the generated `venv` folder. If it contains a `Scripts` folder, use  `venv/Scripts/activate` as the path in the command. If it contains a `bin` folder, use `venv/bin/activate` as the path in the command.
 > You will know it is running successfully when you see `(venv)` or `((venv))` at the beginning of your terminal prompt.
 
 
@@ -100,7 +100,5 @@ Instead of:
 python folder_name/file_name.py
 
 ```
-
-for classes implemented as modules.
 
 *This ensures that all relative imports and classes within the module resolve correctly.*
