@@ -1,6 +1,6 @@
 shared:
   window_size: 3.0    # Duration of each bird call to be fed to CNN in seconds
-  sr: 44100           # Sample rate in Hz. How many audio samples are captured per second.
+  sr: 24000           # Sample rate in Hz. How many audio samples are captured per second.
                       # Must match the sample rate you record/train at everywhere
 
 spec_config:
