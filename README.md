@@ -84,7 +84,7 @@ python -m pip install -r requirements.txt
 
 To test your scripts or experiment with the data:
 
-1. Create a folder named `test` (or similar) at the root level of the project.
+1. Create a folder named `test` (or similar) at the root level of the project. *This folder should be included in your .gitignore file.*
 2. You can create standard Python files (`.py`) or Jupyter Notebooks (`.ipynb`) inside this folder to safely test your code without altering the main project files.
 3. Most of the project folders contain classes and are implemented as Python modules (indicated by the presence of an `__init__.py` file). You can import these classes directly into your test files.
 4. **Important:** Because these folders are structured as modules, if you want to execute a script located inside one of them, you should run it using the module flag (`-m`) from the root directory instead of running the file path directly.

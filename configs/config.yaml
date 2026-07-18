@@ -3,8 +3,6 @@ shared:
   sr: 24000           # Sample rate in Hz. How many audio samples are captured per second.
                       # Must match the sample rate you record/train at everywhere
 
-  hop_size: 1.0       # Hop between overlapping segements in seconds
-
 spec_config:
   low_hz: 300.0       # Bandpass filter: frequencies BELOW this are removed.
   high_hz: 8200       # Bandpass filter: frequencies ABOVE this are removed.
@@ -32,4 +30,5 @@ spec_config:
                       # but a bigger input to the model.
 
 audio_config:
+  hop_size: 1.0       # Hop between overlapping segements in seconds
   

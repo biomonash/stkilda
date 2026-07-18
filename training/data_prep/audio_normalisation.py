@@ -11,6 +11,14 @@ from typing import Optional
 
 class AudioNorm:
     def __init__(self, window_size: float, sr: int, hop_size: float):
+        """
+        Constructor for the AudioNorm class. Initializes the window size, sampling rate, and hop size for audio normalization.
+
+        Args:
+            window_size (float): The duration of each audio segment in seconds.
+            sr (int): The target sampling rate in Hz.
+            hop_size (float): The hop size for overlapping segments in seconds.
+        """
         self.window_size = window_size
         self.sampling_rate = sr
         self.hop_size = hop_size
@@ -38,7 +46,7 @@ class AudioNorm:
             merged_cfg = {
                 "window_size": shared_cfg["window_size"],
                 "sr": shared_cfg["sr"],
-                "hop_size": shared_cfg["hop_size"]
+                "hop_size": audio_cfg["hop_size"]
             }
         except KeyError as e:
             raise ValueError(
@@ -92,7 +100,7 @@ class AudioNorm:
         If the audio length >= window size ignore.
 
         ASSUMPTION: The audio input contains 1 full bird call. This is important as the padding
-        can be done at the start or the end of the call.
+        can only be done at the start or the end of the call.
 
         Args:
             audio_samples (np.ndarray): Audio samples data. Accepted shape is (Number of samples, )
@@ -134,14 +142,16 @@ class AudioNorm:
             List of np.ndarray segments, each of shape (window_samples,)
         """
         # Convert time durations to integer sample counts
-        window_samples = int(self.window_size * self.sampling_rate)   # e.g. 3.0 * 44100 = 132300
-        hop_samples    = int(self.hop_size   * self.sampling_rate)    # e.g. 1.0 * 44100 = 44100
+        window_samples = int(self.window_size * self.sampling_rate)
+        hop_samples    = int(self.hop_size   * self.sampling_rate)
 
         segments = []
         start = 0
 
         while start < len(audio):
-            segment = audio[start : start + window_samples]  # slice the window, check for 
+            # Slice 1 window segment from the audio
+            # Numpy automatically handles cases where the slice exceeds the array length, returning a shorter array
+            segment = audio[start : start + window_samples]
 
             # If this slice is shorter than the window, pad it to the full window size using silence at the end
             if len(segment) < window_samples:
