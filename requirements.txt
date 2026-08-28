@@ -1,3 +1,6 @@
 numpy==2.3.5
 pyyaml
 scipy
+pandas
+librosa
+soundfile

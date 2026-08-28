@@ -74,10 +74,6 @@ class DataLoader:
         Extracts annotated sounds from audio files using their selection tables and classifies them into 'Penguin' folder or 'noise' folder 
         at the path in 'output_dir'. Annotations which were not labelled are put into a 'Unlabelled' folder at 'output_dir'.
 
-        The selection tables of the audio files should have file name formatted as:
-
-            <Audio_file_name>_selection_table.txt
-
         @Params:
             original_files_path (str): Path of folder containing the original audio recordings
             selection_tables_file_paths (str): Path of the folder containing the selection tables of the audio files
