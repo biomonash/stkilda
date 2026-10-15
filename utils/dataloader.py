@@ -2,7 +2,8 @@ import os
 import json
 from glob import glob
 from pathlib import Path
-
+from typing import Optional, List, Tuple
+import yaml
 import pandas as pd
 import librosa
 import soundfile as sf
@@ -65,7 +66,7 @@ class DataLoader:
         return cls(**merged_cfg)
 
     def data_clip(self, original_files_path, selection_tables_file_paths,
-                  output_dir):
+                  output_dir, noise_padding:bool):
 
         penguin_out = Path(output_dir) / "Penguin_Clips"
         meta_out = Path(output_dir) / "Penguin_MetaData"
@@ -76,6 +77,8 @@ class DataLoader:
         selection_files = glob(
             os.path.join(selection_tables_file_paths, "*.tsv")
         )
+
+        padding_duration = self._clip_pad_max_ratio * self._window_size
 
         for sel_file in selection_files:
 
@@ -103,13 +106,18 @@ class DataLoader:
                 begin_time_short = int(begin_time)
                 end_time_short = int(end_time)
 
-                duration = end_time - begin_time
+                if noise_padding and annotation.lower() == "penguin":
+                    audio_duration = sf.info(audio_path).duration
+                    begin_time = max(0, begin_time - padding_duration)
+                    end_time = min(audio_duration, end_time + padding_duration)
 
+                duration = end_time - begin_time
 
                 if duration <= 0:
                     print(f"Invalid duration in {sel_file}, row {idx}")
                     continue
 
+                
                 segment, sr = librosa.load(
                     audio_path,
                     sr=self.target_sr,
@@ -123,7 +131,7 @@ class DataLoader:
 
                 general_file_name = f"{base_name}_{begin_time_short}_{end_time_short}"
                 
-                if annotation == "penguin" :
+                if annotation.lower() == "penguin" :
                     file_name = f"{general_file_name}_call"
                     audio_output_path = penguin_out / f"{file_name}.wav"
                     json_output_path = meta_out / f"{file_name}.json"
