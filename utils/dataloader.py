@@ -1,14 +1,17 @@
 import os
+import json
 from glob import glob
-from typing import Tuple, List, Optional
+from pathlib import Path
+from typing import Optional, List, Tuple
+import yaml
 import pandas as pd
 import librosa
 import soundfile as sf
-from pathlib import Path
-from utils.config_finder import find_config_path
-import yaml
+import numpy as np
+
 
 class DataLoader:
+
     def __init__(
         self,
         window_size: float = 3.0,
@@ -62,89 +65,124 @@ class DataLoader:
 
         return cls(**merged_cfg)
 
-    
-    def data_clip(
-        self,
-        original_files_path: str,
-        selection_tables_file_paths: str,
-        output_dir: str,
-        noise_padding: bool
-    ) -> None:
-        """
-        Extracts annotated sounds from audio files using their selection tables and classifies them into 'Penguin' folder or 'noise' folder 
-        at the path in 'output_dir'. Annotations which were not labelled are put into a 'Unlabelled' folder at 'output_dir'.
+    def data_clip(self, original_files_path, selection_tables_file_paths,
+                  output_dir, noise_padding:bool):
 
-        @Params:
-            original_files_path (str): Path of folder containing the original audio recordings
-            selection_tables_file_paths (str): Path of the folder containing the selection tables of the audio files
-            output_dir (str): Path for the 'Penguin' folder and 'noise' folder to contain the clipped annotated sound 
-            noise_padding (bool): Flag to choose whether to pad start and end of penguin call annotations with background noise from the original file. Amount of passing is clip_pad_max_ratio * window_size
-        """
+        penguin_out = Path(output_dir) / "Penguin_Clips"
+        meta_out = Path(output_dir) / "Penguin_MetaData"
 
-        # Create file paths to Penguin, noise and unlabelled folders
-        penguin_out = Path(output_dir) / "Penguin"
-        noise_out = Path(output_dir) / "noise"
-        unlabelled_out = Path(output_dir) / "Unlabelled_Annotations"
-
-        # Create the Penguin, noise and unlabelled folders at 'output_dir' if they do not already exist
         penguin_out.mkdir(parents=True, exist_ok=True)
-        noise_out.mkdir(parents=True, exist_ok=True)
-        unlabelled_out.mkdir(parents=True, exist_ok=True)
+        meta_out.mkdir(parents=True, exist_ok=True)
 
-        # Obtain the file paths of all the selection tables
-        selection_files = glob(os.path.join(selection_tables_file_paths, "*.txt"))
+        selection_files = glob(
+            os.path.join(selection_tables_file_paths, "*.tsv")
+        )
 
-        # Duration by which to pad Penguin call with background noise at the start and the end
-        pad_duration = self._clip_pad_max_ratio * self._window_size
+        padding_duration = self._clip_pad_max_ratio * self._window_size
 
-        # Loop through each selection table
         for sel_file in selection_files:
-            # Obtain the corresponding audio file name
-            base_name = os.path.basename(sel_file).split('.')[0].replace("-selection", "").replace("_selection_table", "")
-            # Obtain file path to audio file
-            audio_path = os.path.join(original_files_path, f"{base_name}.wav")
+
+            base_name = Path(sel_file).name.replace(
+                ".Table.1.selections.tsv", ""
+            )
+
+            audio_path = os.path.join(
+                original_files_path, f"{base_name}.wav"
+            )
 
             if not os.path.exists(audio_path):
-                print(f"Audio file missing at {audio_path}")
+                print(f"Audio file not found: {audio_path}")
                 continue
 
-            # Obtain the selections in the selection table
             df_sel = pd.read_csv(sel_file, sep="\t")
+            df_sel.columns = df_sel.columns.str.strip()
 
-            # Iterate through every selection in the file
             for idx, row in df_sel.iterrows():
-                # Obtain the begin time and end time of the selection
+
                 begin_time = row["Begin Time (s)"]
                 end_time = row["End Time (s)"]
-                selection_id = row["Selection"]
+                annotation = row["Annotation"]
 
-                # Get label of annotation
-                label_type = row.get("Annotation", "No Label")
+                begin_time_short = int(begin_time)
+                end_time_short = int(end_time)
 
-                # If noise padding must be done, we alter the begin time and end time of clipping
-                if noise_padding and "penguin" in str(label_type).lower():
+                if noise_padding and annotation.lower() == "penguin":
                     audio_duration = sf.info(audio_path).duration
-                    begin_time = max(0, begin_time - pad_duration)
-                    end_time = min(audio_duration, end_time + pad_duration)
+                    begin_time = max(0, begin_time - padding_duration)
+                    end_time = min(audio_duration, end_time + padding_duration)
 
-                # Load the annotated audio from the file
+                duration = end_time - begin_time
+
+                if duration <= 0:
+                    print(f"Invalid duration in {sel_file}, row {idx}")
+                    continue
+
+                
                 segment, sr = librosa.load(
                     audio_path,
-                    sr = self.target_sr,
-                    offset= begin_time,
-                    duration= end_time - begin_time
+                    sr=self.target_sr,
+                    offset=begin_time,
+                    duration=duration
                 )
 
-                # Save the audio clip based on its label
-                if str(label_type) == "No Label":
-                    out_path = unlabelled_out / f"{base_name}_unlabelled_clip_{selection_id}.wav"
-                elif "penguin" in str(label_type).lower():
-                    out_path = penguin_out / f"{base_name}_{label_type}_{selection_id}.wav"
-                else:
-                    out_path = noise_out / f"{base_name}_{label_type}_{selection_id}.wav"
+                if len(segment) == 0:
+                    print(f"Empty audio segment: row {idx}")
+                    continue
 
+                general_file_name = f"{base_name}_{begin_time_short}_{end_time_short}"
+                
+                if annotation.lower() == "penguin" :
+                    file_name = f"{general_file_name}_call"
+                    audio_output_path = penguin_out / f"{file_name}.wav"
+                    json_output_path = meta_out / f"{file_name}.json"
+                else:
+                    file_name = f"{general_file_name}_noise"
+                    audio_output_path = penguin_out / f"{file_name}.wav"
+                    json_output_path = meta_out / f"{file_name}.json"
+
+                
                 if len(segment) > 0:
-                    sf.write(out_path, segment, int(sr))
+                    sf.write(audio_output_path, segment, sr)
+
+                    self.penguin_json(
+                        begin_time,
+                        end_time,
+                        row.get("Annotation"),
+                        row.get("call_type"),
+                        row.get("condition"),
+                        row.get("distance"),
+                        row.get("counts"),
+                        json_output_path
+                    )
+
+                    print(f"Saved: {file_name}")
+
+        print("All clipping completed!")
+
+    def penguin_json(self, begin_time, end_time, annotation, call_type, condition,
+                     distance, count, json_path):
+        data = {
+            "begin_time": self.clean_values_json(begin_time),
+            "end_time": self.clean_values_json(end_time),
+            "annotation": self.clean_values_json(annotation),
+            "call_type": self.clean_values_json(call_type),
+            "condition": self.clean_values_json(condition),
+            "distance": self.clean_values_json(distance),
+            "count": self.clean_values_json(count)
+        }
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+
+    def clean_values_json(self, value):
+        if pd.isna(value):
+            return None
+
+        if isinstance(value, np.generic):
+            return value.item()
+
+        return value
+
 
     def data_load(
         self,
