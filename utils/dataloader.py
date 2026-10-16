@@ -2,12 +2,14 @@ import os
 import json
 from glob import glob
 from pathlib import Path
+from config_finder import find_config_path
 from typing import Optional, List, Tuple
 import yaml
 import pandas as pd
 import librosa
 import soundfile as sf
 import numpy as np
+
 
 
 class DataLoader:
@@ -99,8 +101,8 @@ class DataLoader:
 
             for idx, row in df_sel.iterrows():
 
-                begin_time = row["Begin Time (s)"]
-                end_time = row["End Time (s)"]
+                begin_time = new_begin_time = row["Begin Time (s)"]
+                end_time = new_end_time = row["End Time (s)"]
                 annotation = row["Annotation"]
 
                 begin_time_short = int(begin_time)
@@ -108,26 +110,35 @@ class DataLoader:
 
                 if noise_padding and annotation.lower() == "penguin":
                     audio_duration = sf.info(audio_path).duration
-                    begin_time = max(0, begin_time - padding_duration)
-                    end_time = min(audio_duration, end_time + padding_duration)
+                    new_begin_time = max(0, begin_time - padding_duration)
+                    new_end_time = min(audio_duration, end_time + padding_duration)
 
-                duration = end_time - begin_time
+                duration = new_end_time - new_begin_time
 
                 if duration <= 0:
                     print(f"Invalid duration in {sel_file}, row {idx}")
                     continue
-
                 
                 segment, sr = librosa.load(
                     audio_path,
                     sr=self.target_sr,
-                    offset=begin_time,
+                    offset=new_begin_time,
                     duration=duration
                 )
 
                 if len(segment) == 0:
                     print(f"Empty audio segment: row {idx}")
                     continue
+
+                # Fill in missing pad time at start with silence
+                if (begin_time - padding_duration) < 0:
+                    pad_samples = int((padding_duration - begin_time) * sr)
+                    segment = np.pad(segment, (pad_samples, 0), mode="constant", constant_values=0.0)
+
+                # Fill in missing pad time at end with silence
+                if (end_time - padding_duration) > audio_duration:
+                    pad_samples = int((audio_duration - end_time) * sr)
+                    segment = np.pad(segment, (pad_samples, 0), mode="constant", constant_values=0.0)
 
                 general_file_name = f"{base_name}_{begin_time_short}_{end_time_short}"
                 
@@ -142,7 +153,7 @@ class DataLoader:
 
                 
                 if len(segment) > 0:
-                    sf.write(audio_output_path, segment, sr)
+                    sf.write(audio_output_path, segment, int(sr))
 
                     self.penguin_json(
                         begin_time,
@@ -184,81 +195,81 @@ class DataLoader:
         return value
 
 
-    def data_load(
-        self,
-        original_files_folder_path: str,
-        selection_tables_folder_path: str,
-        noise_padding: bool
-    ) -> List[Tuple[object, int]]:
-        """
-        Method to load and return labelled, clipped audio files based on annotations in selections tables at 'selection_tables_folder_paths' with
-        the corresponding audio files found at 'original_files_folder_path'.
+    # def data_load(
+    #     self,
+    #     original_files_folder_path: str,
+    #     selection_tables_folder_path: str,
+    #     noise_padding: bool
+    # ) -> List[Tuple[object, int]]:
+    #     """
+    #     Method to load and return labelled, clipped audio files based on annotations in selections tables at 'selection_tables_folder_paths' with
+    #     the corresponding audio files found at 'original_files_folder_path'.
 
-        Penguin calls are labelled as 1 while non-penguin sounds are labelled as zero
+    #     Penguin calls are labelled as 1 while non-penguin sounds are labelled as zero
 
-        @Params:
-            original_files_folder_path (str): Path of folder which contains original audio files
-            selection_tables_folder_path (str): Path of folder which contains selection tables
-            noise_padding (bool): Flag to choose whether to pad start and end of penguin call annotations with background noise from the original file. Amount of passing is clip_pad_max_ratio * window_size
+    #     @Params:
+    #         original_files_folder_path (str): Path of folder which contains original audio files
+    #         selection_tables_folder_path (str): Path of folder which contains selection tables
+    #         noise_padding (bool): Flag to choose whether to pad start and end of penguin call annotations with background noise from the original file. Amount of passing is clip_pad_max_ratio * window_size
 
-        @Returns:
-            - A list containing tuples of the form (samples of clipped audio, label for audio)
-        """
+    #     @Returns:
+    #         - A list containing tuples of the form (samples of clipped audio, label for audio)
+    #     """
 
-        # List to contain the labelled data
-        labelled_data = []
-        # Duration by which to pad Penguin call with background noise at the start and the end
-        pad_duration = self._clip_pad_max_ratio * self._window_size
+    #     # List to contain the labelled data
+    #     labelled_data = []
+    #     # Duration by which to pad Penguin call with background noise at the start and the end
+    #     pad_duration = self._clip_pad_max_ratio * self._window_size
 
-        # File paths of the different selection files
-        selection_files = glob(os.path.join(selection_tables_folder_path, "*.txt"))
+    #     # File paths of the different selection files
+    #     selection_files = glob(os.path.join(selection_tables_folder_path, "*.txt"))
 
 
-        # Loop through all selection files
-        for sel_file in selection_files:
-            # Obtain file name of the corresponding audio file of selection file
-            base_name = os.path.basename(sel_file).split('.')[0].replace("-selection", "").replace("_selection_table", "")
-            # Get the file path of the corresponding file path
-            audio_path = os.path.join(original_files_folder_path, f"{base_name}.wav")
+    #     # Loop through all selection files
+    #     for sel_file in selection_files:
+    #         # Obtain file name of the corresponding audio file of selection file
+    #         base_name = os.path.basename(sel_file).split('.')[0].replace("-selection", "").replace("_selection_table", "")
+    #         # Get the file path of the corresponding file path
+    #         audio_path = os.path.join(original_files_folder_path, f"{base_name}.wav")
 
-            # Check if the audio file exists at file path
-            if not os.path.exists(audio_path):
-                print(f"No audio file found at {audio_path}")
-                continue
+    #         # Check if the audio file exists at file path
+    #         if not os.path.exists(audio_path):
+    #             print(f"No audio file found at {audio_path}")
+    #             continue
 
-            # Get the audio duration
-            audio_duration = sf.info(audio_path).duration
+    #         # Get the audio duration
+    #         audio_duration = sf.info(audio_path).duration
 
-            # Obtain the selections
-            df_sel = pd.read_csv(sel_file, sep="\t")
+    #         # Obtain the selections
+    #         df_sel = pd.read_csv(sel_file, sep="\t")
 
-            """ Loop through all entries in the selection table"""
-            for idx, row in df_sel.iterrows():
-                # Obtain the begin time and end time of the annotation
-                begin_time = row["Begin Time (s)"]
-                end_time = row["End Time (s)"]
+    #         """ Loop through all entries in the selection table"""
+    #         for idx, row in df_sel.iterrows():
+    #             # Obtain the begin time and end time of the annotation
+    #             begin_time = row["Begin Time (s)"]
+    #             end_time = row["End Time (s)"]
 
-                # Get label of annotation
-                label_type = row.get("Annotation", "No Label")
+    #             # Get label of annotation
+    #             label_type = row.get("Annotation", "No Label")
 
-                if label_type == "No Label":
-                    print(f"Selection {idx} for {base_name}.wav is not labelled")
-                    continue
+    #             if label_type == "No Label":
+    #                 print(f"Selection {idx} for {base_name}.wav is not labelled")
+    #                 continue
 
-                if noise_padding and "penguin" in str(label_type).lower():
-                    begin_time = max(0, begin_time - pad_duration)
-                    end_time = min(audio_duration, end_time + pad_duration)
+    #             if noise_padding and "penguin" in str(label_type).lower():
+    #                 begin_time = max(0, begin_time - pad_duration)
+    #                 end_time = min(audio_duration, end_time + pad_duration)
 
-                # Clip the annotation
-                segment, sr = librosa.load(
-                                    audio_path,
-                                    sr = self.target_sr,
-                                    offset= begin_time,
-                                    duration= end_time - begin_time
-                                )
+    #             # Clip the annotation
+    #             segment, sr = librosa.load(
+    #                                 audio_path,
+    #                                 sr = self.target_sr,
+    #                                 offset= begin_time,
+    #                                 duration= end_time - begin_time
+    #                             )
 
-                label = 1 if "penguin" in str(label_type).lower() else 0
+    #             label = 1 if "penguin" in str(label_type).lower() else 0
 
-                labelled_data.append((segment, label))
+    #             labelled_data.append((segment, label))
 
-        return labelled_data
+    #     return labelled_data
