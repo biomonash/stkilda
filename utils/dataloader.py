@@ -15,7 +15,7 @@ import numpy as np
 class DataLoader:
 
     acceptable_selection_file_extensions : list[str] = ["tsv", "txt"]
-    acceptable_audio_file_extensions : list[str] = ["wav", "mp3"]
+    acceptable_audio_file_extensions : list[str] = ["wav", "mp3", "flac"]
 
     required_columns : Set[str] = {
             "Annotation",
@@ -105,7 +105,7 @@ class DataLoader:
             - selection tables must have the format '{Audio_File_Name}.Table.1.selections.{extension}'
             - 2 audio files cannot have the same file name (even with different extensions)
             - acceptable selection tables file types: ['tsv', 'txt']
-            - acceptable audio file types: ['.wav', 'mp3']
+            - acceptable audio file types: ['.wav', 'mp3', '.flac']
             - separator for selection table file: '\\t'
             - selection tables must have the following columns:
                 - Annotation
