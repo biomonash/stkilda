@@ -2,14 +2,13 @@ import os
 import json
 from glob import glob
 from pathlib import Path
-from config_finder import find_config_path
+from utils.config_finder import find_config_path
 from typing import Optional, List, Tuple, Set
 import yaml
 import pandas as pd
 import librosa
 import soundfile as sf
 import numpy as np
-
 
 
 class DataLoader:
@@ -232,7 +231,7 @@ class DataLoader:
                     continue
 
                 # Extract the audio clip from the audio data
-                segment= audio_data[new_begin_time * self.target_sr: new_end_time * self.target_sr]
+                segment= audio_data[int(new_begin_time * self.target_sr): int(new_end_time * self.target_sr)]
 
                 # Check if segment loaded is valid
                 if len(segment) <= 0:
