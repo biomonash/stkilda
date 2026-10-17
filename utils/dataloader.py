@@ -133,15 +133,32 @@ class DataLoader:
         self.check_dir_exists([original_files_path, selection_tables_file_paths])
 
         # Create output directories. Stop if they cannot be created.
-        penguin_out = output_dir / "Audio_Clips"
+        audio_out = output_dir / "Audio_Clips"
         meta_out = output_dir / "Audio_MetaData"
 
         try:
-            penguin_out.mkdir(parents=True, exist_ok=True)
+            audio_out.mkdir(parents=True, exist_ok=True)
             meta_out.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise RuntimeError(
                 f"Could not create output directories in {output_dir}: {exc}"
+            ) from exc
+
+        penguin_audio_out = audio_out / "penguin"
+        noise_audio_out = audio_out / "noise"
+
+        penguin_meta_out = meta_out / "penguin"
+        noise_meta_out = meta_out / "noise"
+
+        try:
+            penguin_audio_out.mkdir(parents=True, exist_ok=True)
+            noise_audio_out.mkdir(parents=True, exist_ok=True)
+
+            penguin_meta_out.mkdir(parents=True, exist_ok=True)
+            noise_meta_out.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise RuntimeError(
+                f"Could not create output directories: {exc}"
             ) from exc
 
         # Read all selection tables of acceptable file path
@@ -257,12 +274,12 @@ class DataLoader:
                 
                 if annotation.lower() == "penguin" :
                     file_name = f"{general_file_name}_call"
-                    audio_output_path = penguin_out / f"{file_name}.wav"
-                    json_output_path = meta_out / f"{file_name}.json"
+                    audio_output_path = penguin_audio_out / f"{file_name}.wav"
+                    json_output_path = penguin_meta_out / f"{file_name}.json"
                 else:
                     file_name = f"{general_file_name}_noise"
-                    audio_output_path = penguin_out / f"{file_name}.wav"
-                    json_output_path = meta_out / f"{file_name}.json"
+                    audio_output_path = noise_audio_out / f"{file_name}.wav"
+                    json_output_path = noise_meta_out / f"{file_name}.json"
 
                 # Save the audio clip and its metadata
                 if len(segment) > 0:
